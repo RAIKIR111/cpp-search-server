@@ -62,27 +62,16 @@ public:
         if (document == "")
             return;
         const vector<string> words = SplitIntoWordsNoStop(document);
-        for (int count = 0; count < words.size(); ++count) {
-            word_and_ids_[words[count]].insert(document_id);
-            repetitions_[{document_id, words[count]}] += 1;
+        for (string word : words) {
+            word_and_ids_[word].insert(document_id);
+            repetitions_[word][document_id] = FindTf(count(words.begin(), words.end(), word), words.size());
         }
-
-        /*for (auto& item : word_and_ids_) {
-            cout << item.first << ": ";
-            for (int id : item.second) {
-                cout << id << ' ';
-            }
-            cout << endl;
-        }*/
-
     }
 
     vector<Document> FindTopDocuments(const string& raw_query) const {
-        const set<string> query_words = ParseQuery(raw_query);
-        const set<string> minus_words = SetMinusWords(query_words);
-        const set<string> plus_words = SetPlusWords(query_words);
+        Query query = ParseQuery(raw_query);
 
-        vector<Document> matched_documents = FindAllDocuments(plus_words, minus_words);
+        vector<Document> matched_documents = FindAllDocuments(query.plus_words, query.minus_words);
 
         sort(matched_documents.begin(), matched_documents.end(),
             [](const Document& lhs, const Document& rhs) {
@@ -99,36 +88,18 @@ public:
     }
 
 private:
+    struct Query {
+        set<string> minus_words;
+        set<string> plus_words;
+    };
+
     int document_count_ = 0;
 
     map<string, set<int>> word_and_ids_;
 
     set<string> stop_words_;
 
-    map<pair<int, string>, int> repetitions_; // id, слово - количество повторений слова в документе
-
-    set<string> SetMinusWords(const set<string>& words) const {
-        set<string> minus_words;
-        string str;
-        for (string item : words) {
-            if (item[0] == '-') {
-                str = item;
-                str.erase(0, 1);
-                minus_words.insert(str);
-            }
-        }
-        return minus_words;
-    }
-
-    set<string> SetPlusWords(const set<string>& words) const {
-        set<string> plus_words;
-        for (string item : words) {
-            if (item[0] != '-') {
-                plus_words.insert(item);
-            }
-        }
-        return plus_words;
-    }
+    map<string, map<int, double>> repetitions_; // слово - id - количество повторений слова (TF)
 
     bool IsStopWord(const string& word) const {
         return stop_words_.count(word) > 0;
@@ -144,12 +115,33 @@ private:
         return words;
     }
 
-    set<string> ParseQuery(const string& text) const {
-        set<string> query_words;
+    Query ParseQuery(const string& text) const {
+        Query obj;
         for (const string& word : SplitIntoWordsNoStop(text)) {
-            query_words.insert(word);
+            ParseQueryWord(word, obj);
         }
-        return query_words;
+        return obj;
+    }
+
+    void ParseQueryWord(const string& word, Query& obj) const {
+        string temp_str;
+        if (word[0] != '-') {
+            obj.plus_words.insert(word);
+        }
+        else
+        {
+            temp_str = word;
+            temp_str.erase(0, 1);
+            obj.minus_words.insert(temp_str);
+        }
+    }
+
+    double FindIdf(const int& document_count, const int& id_count) const {
+        return log(double(document_count) / double(id_count));
+    }
+
+    double FindTf(const int& repetition_count, const int& document_size) const {
+        return (double(repetition_count) / double(document_size));
     }
 
     vector<Document> FindAllDocuments(const set<string>& plus_words, const set<string>& minus_words) const {
@@ -170,12 +162,6 @@ private:
             }
         }
 
-
-        /*for (auto& item : id_and_plus_words) {
-            cout << item.first << ' ' << item.second << endl;
-        }*/
-
-
         //id_and_plus_words
         //word_and_ids_
         //doc_lengths_
@@ -183,33 +169,18 @@ private:
 
         vector<Document> main_result;
         Document obj;
-        double var1 = 0.0;
-        double var2 = 0.0;
+        double idf = 0.0;
+        double tf = 0.0;
         double temp_result = 0.0;
-        int doc_length = 0;
-
-
-        /*for (auto& item : word_and_ids_) {
-            cout << item.first << ": ";
-            for (int id : item.second) {
-                cout << id << ' ';
-            }
-            cout << endl;
-        }*/
-
         bool flag = false;
         for (int id = 0; id < document_count_; ++id) {
             flag = false;
-            for (const auto& item : word_and_ids_) {
-                if (item.second.count(id))
-                    doc_length += 1;
-            }
             for (const string& plus_word : plus_words) {
                 if (word_and_ids_.count(plus_word))
                     if (word_and_ids_.at(plus_word).count(id)) {
-                        var1 = log(double(document_count_) / double(word_and_ids_.at(plus_word).size()));
-                        var2 = double(repetitions_.at({ id, plus_word })) / double(doc_length);
-                        temp_result += var1 * var2;
+                        idf = FindIdf(document_count_, word_and_ids_.at(plus_word).size());
+                        tf = repetitions_.at(plus_word).at(id);
+                        temp_result += idf * tf;
                         flag = true;
                     }
             }
@@ -219,7 +190,6 @@ private:
                 main_result.push_back(obj);
                 temp_result = 0.0;
             }
-            doc_length = 0;
         }
 
         return main_result;
