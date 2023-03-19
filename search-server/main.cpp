@@ -333,28 +333,25 @@ void TestAddDocumentAndFindItByQuery() {
 
     {
         SearchServer server;
+        vector<Document> found_docs = server.FindTopDocuments("пушистый ухоженный кот"s);
+        ASSERT(found_docs.size() == 0);
+
         server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
-        const vector<Document> found_docs = server.FindTopDocuments("пушистый ухоженный кот"s);
+        found_docs = server.FindTopDocuments("пушистый ухоженный кот"s);
         ASSERT(found_docs.size() == 1);
         ASSERT(found_docs[0].id == doc_id);
-    }
-    {
-        SearchServer server;
-        server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
+
         server.AddDocument(doc_id_1, content_1, DocumentStatus::ACTUAL, ratings_1);
-        const vector<Document> bad_found_docs = server.FindTopDocuments("cat dog"s);
-        ASSERT(bad_found_docs.size() == 0);
-        const vector<Document> found_docs = server.FindTopDocuments("пушистый ухоженный кот"s);
+        found_docs = server.FindTopDocuments("cat dog"s);
+        ASSERT(found_docs.size() == 0);
+
+        found_docs = server.FindTopDocuments("пушистый ухоженный кот"s);
         ASSERT(found_docs.size() == 2);
         ASSERT(found_docs[0].id == doc_id_1);
         ASSERT(found_docs[1].id == doc_id);
-    }
-    {
-        SearchServer server;
-        server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
-        server.AddDocument(doc_id_1, content_1, DocumentStatus::ACTUAL, ratings_1);
+
         server.AddDocument(doc_id_2, content_2, DocumentStatus::ACTUAL, ratings_2);
-        const vector<Document> found_docs = server.FindTopDocuments("пушистый ухоженный кот"s);
+        found_docs = server.FindTopDocuments("пушистый ухоженный кот"s);
         ASSERT(found_docs.size() == 2);
         ASSERT(found_docs[0].id == doc_id_1);
         ASSERT(found_docs[1].id == doc_id);
@@ -421,10 +418,9 @@ void TestSortByRelevance() {
         search_server.AddDocument(2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1});
         search_server.AddDocument(3, "ухоженный скворец евгений"s,         DocumentStatus::ACTUAL, {9});
         const vector<Document> found_docs = search_server.FindTopDocuments("пушистый ухоженный кот"s);
-        ASSERT(found_docs[0].relevance > found_docs[1].relevance || found_docs[0].rating > found_docs[1].rating);
-        ASSERT(found_docs[1].relevance > found_docs[2].relevance || found_docs[1].rating > found_docs[2].rating);
-        ASSERT(found_docs[2].relevance > found_docs[3].relevance || found_docs[2].rating > found_docs[3].rating);
-        ASSERT(found_docs[3].relevance > found_docs[4].relevance || found_docs[3].rating > found_docs[4].rating);
+        for (int count = 1; count < found_docs.size(); ++count) {
+            ASSERT(found_docs[count-1].relevance > found_docs[count].relevance || found_docs[count-1].rating > found_docs[count].rating);
+        }
     }
 }
 
@@ -434,14 +430,22 @@ void TestRatingCalculation() {
         SearchServer search_server;
         search_server.SetStopWords("и в на"s);
         search_server.AddDocument(0, "белый кот и модный ошейник"s,        DocumentStatus::ACTUAL, {8, -3});
+        const int rating_0 = (8 - 3) / 2;
+
         search_server.AddDocument(1, "пушистый кот пушистый хвост"s,       DocumentStatus::ACTUAL, {7, 2, 7});
+        const int rating_1 = (7 + 2 + 7) / 3;
+
         search_server.AddDocument(2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1});
+        const int rating_2 = (5 - 12 + 2 + 1) / 4;
+
         search_server.AddDocument(3, "ухоженный скворец евгений"s,         DocumentStatus::ACTUAL, {9});
+        const int rating_3 = 9 / 1;
+        
         const vector<Document> found_docs = search_server.FindTopDocuments("пушистый ухоженный кот"s);
-        ASSERT(found_docs[0].rating == 5);
-        ASSERT(found_docs[1].rating == 9);
-        ASSERT(found_docs[2].rating == 2);
-        ASSERT(found_docs[3].rating == -1);
+        ASSERT(found_docs[0].rating == rating_1);
+        ASSERT(found_docs[1].rating == rating_3);
+        ASSERT(found_docs[2].rating == rating_0);
+        ASSERT(found_docs[3].rating == rating_2);
     }
 }
 
@@ -486,10 +490,16 @@ void TestRelevanceCalculation() {
         search_server.AddDocument(2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1});
         search_server.AddDocument(3, "ухоженный скворец евгений"s,         DocumentStatus::ACTUAL, {9});
         const vector<Document> found_docs = search_server.FindTopDocuments("пушистый ухоженный кот"s);
-        ASSERT(fabs(found_docs[0].relevance - 0.866434) < 1e-6);
-        ASSERT(fabs(found_docs[1].relevance - 0.231049) < 1e-6);
-        ASSERT(fabs(found_docs[2].relevance - 0.173287) < 1e-6);
-        ASSERT(fabs(found_docs[3].relevance - 0.173287) < 1e-6);
+        // Формула релевантности: log(общ. кол-во док-ов / кол-во док-ов, где встречается слово) *
+        // (сколько раз слово встречается в док-нте / общее кол-во слов в док-нте) + ...
+        const double relevance_0 = double(log(4/2)) * 1/4;
+        const double relevance_1 = double(log(4/1)) * 2/4 + double(log(4/2)) * 1/4;
+        const double relevance_2 = double(log(4/2)) * 1/4;
+        const double relevance_3 = double(log(4/2)) * 1/3;
+        ASSERT(fabs(found_docs[0].relevance - relevance_1) < 1e-6);
+        ASSERT(fabs(found_docs[1].relevance - relevance_3) < 1e-6);
+        ASSERT(fabs(found_docs[2].relevance - relevance_0) < 1e-6);
+        ASSERT(fabs(found_docs[3].relevance - relevance_2) < 1e-6);
     }
 }
 
