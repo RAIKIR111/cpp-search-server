@@ -138,11 +138,6 @@ public:
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const {
         const Query query = ParseQuery(raw_query);
 
-        for (const string& minus_word : query.minus_words) {
-            if (minus_word[0] == '-') throw invalid_argument("Наличие более чем одного минуса перед словами, которых не должно быть в искомых документах, например, пушистый --кот. В середине слов минусы разрешаются, например: иван-чай!");
-            if (minus_word.empty()) throw invalid_argument("Отсутствие текста после символа «минус» в поисковом запросе: пушистый -");
-        }
-
         vector<string> matched_words;
         for (const string& word : query.plus_words) {
             if (word_to_document_freqs_.count(word) == 0) {
