@@ -30,39 +30,12 @@ public:
     explicit RequestQueue(SearchServer& search_server);
     // сделаем "обёртки" для всех методов поиска, чтобы сохранять результаты для нашей статистики
     template <typename DocumentPredicate>
-    std::vector<Document> AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate) {
-        // напишите реализацию
-        request_count_++;
-        if (request_count_ < min_in_day_) {
-            requests_.pop_front();
-            request_count_--;
-        }
-        requests_.push_back({search_server_->FindTopDocuments(raw_query, document_predicate)});
+    std::vector<Document> AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate);
 
-        return search_server_->FindTopDocuments(raw_query, document_predicate);
-    }
-    std::vector<Document> AddFindRequest(const std::string& raw_query, DocumentStatus status) {
-        // напишите реализацию
-        request_count_++;
-        if (request_count_ < min_in_day_) {
-            requests_.pop_front();
-            request_count_--;
-        }
-        requests_.push_back({search_server_->FindTopDocuments(raw_query, status)});
+    std::vector<Document> AddFindRequest(const std::string& raw_query, DocumentStatus status);
 
-        return search_server_->FindTopDocuments(raw_query, status);
-    }
-    std::vector<Document> AddFindRequest(const std::string& raw_query) {
-        // напишите реализацию
-        request_count_++;
-        if (request_count_ > min_in_day_) {
-            requests_.pop_front();
-            request_count_--;
-        }
-        requests_.push_back({search_server_->FindTopDocuments(raw_query)});
-
-        return search_server_->FindTopDocuments(raw_query);
-    }
+    std::vector<Document> AddFindRequest(const std::string& raw_query);
+    
     int GetNoResultRequests() const;
 private:
     struct QueryResult {
@@ -75,3 +48,16 @@ private:
     int request_count_ = 0;
     SearchServer* search_server_;
 };
+
+template <typename DocumentPredicate>
+std::vector<Document> RequestQueue::AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate) {
+    // напишите реализацию
+    request_count_++;
+    if (request_count_ < min_in_day_) {
+        requests_.pop_front();
+        request_count_--;
+    }
+    requests_.push_back({search_server_->FindTopDocuments(raw_query, document_predicate)});
+
+    return search_server_->FindTopDocuments(raw_query, document_predicate);
+}
