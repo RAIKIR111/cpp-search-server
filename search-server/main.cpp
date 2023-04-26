@@ -40,8 +40,10 @@ int main() {
 
     // слова из разных документов, не является дубликатом
     AddDocument(search_server, 9, "nasty rat with curly hair"s, DocumentStatus::ACTUAL, {1, 2});
-    
+
     cout << "Before duplicates removed: "s << search_server.GetDocumentCount() << endl;
+
     RemoveDuplicates(search_server);
+    
     cout << "After duplicates removed: "s << search_server.GetDocumentCount() << endl;
 }
