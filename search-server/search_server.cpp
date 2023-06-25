@@ -10,16 +10,17 @@ void SearchServer::AddDocument(int document_id, const std::string_view& document
     if ((document_id < 0) || (documents_.count(document_id) > 0)) {
         throw invalid_argument("Invalid document_id"s);
     }
-    storage_.emplace_back(std::move(document));
-    const auto words = SplitIntoWordsNoStop(storage_.back());
+    
+    global_storage_.emplace_back(std::move(document));
+    const auto words = SplitIntoWordsNoStop(global_storage_.back());
 
     const double inv_word_count = 1.0 / words.size();
     for (const string_view& word : words) {
         word_to_document_freqs_[word][document_id] += inv_word_count;
         document_to_word_freqs_[document_id][word] += inv_word_count;
     }
-    documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
-    document_ids_.push_back(document_id);
+    documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status, global_storage_.back()});
+    document_ids_.insert(document_id);
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string_view& raw_query, DocumentStatus status) const {
@@ -96,11 +97,11 @@ tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(const exe
 }
 
 
-std::vector<int>::const_iterator SearchServer::begin() const {
+std::set<int>::const_iterator SearchServer::begin() const {
     return document_ids_.begin();
 }
 
-std::vector<int>::const_iterator SearchServer::end() const {
+std::set<int>::const_iterator SearchServer::end() const {
     return document_ids_.end();
 }
 
@@ -108,7 +109,8 @@ const map<string_view, double>& SearchServer::GetWordFrequencies(const int docum
     if (document_to_word_freqs_.count(document_id)) {
         return document_to_word_freqs_.at(document_id);
     }
-    return empty_map_;
+    static std::map<std::string_view, double> empty_map;
+    return empty_map;
 }
 
 void SearchServer::RemoveDocument(const execution::sequenced_policy&, const int document_id) {
@@ -143,8 +145,8 @@ void SearchServer::RemoveDocument(const execution::parallel_policy&, const int d
 }
 
 void SearchServer::RemoveDocument(const int document_id) {
-    for (auto& [word, document_freqs] : word_to_document_freqs_) {
-        document_freqs.erase(document_id);
+    for (auto& [word, freqs] : document_to_word_freqs_.at(document_id)) {
+        word_to_document_freqs_.at(word).erase(document_id);
     }
     
     documents_.erase(document_id);
