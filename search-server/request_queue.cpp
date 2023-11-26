@@ -3,11 +3,9 @@
 using namespace std;
 
 RequestQueue::RequestQueue(SearchServer& search_server) : search_server_(&search_server) {
-    // напишите реализацию
 }
 
 std::vector<Document> RequestQueue::AddFindRequest(const std::string& raw_query, DocumentStatus status) {
-    // напишите реализацию
     request_count_++;
     if (request_count_ < min_in_day_) {
         requests_.pop_front();
@@ -19,7 +17,6 @@ std::vector<Document> RequestQueue::AddFindRequest(const std::string& raw_query,
 }
 
 std::vector<Document> RequestQueue::AddFindRequest(const std::string& raw_query) {
-    // напишите реализацию
     request_count_++;
     if (request_count_ > min_in_day_) {
         requests_.pop_front();
@@ -31,7 +28,6 @@ std::vector<Document> RequestQueue::AddFindRequest(const std::string& raw_query)
 }
 
 int RequestQueue::GetNoResultRequests() const {
-    // напишите реализацию
     int dst_count = 0;
     auto requests_copy = requests_;
     while (!requests_copy.empty()) {
